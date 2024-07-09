@@ -2,18 +2,32 @@ import express from 'express'
 import cors from 'cors'
 import prisma from './prismaclient'
 import dotenv from 'dotenv'
+import {
+    clerkClient,
+    ClerkExpressWithAuth,
+    LooseAuthProp,
+    WithAuthProp
+} from '@clerk/clerk-sdk-node'
 
+const userList = clerkClient.users.getUserList()
 
 dotenv.config()
-
 const app = express()
-
 const port = 3000
+
+declare global {
+    namespace Express {
+        interface Request extends LooseAuthProp { }
+    }
+}
 
 // Use CORS middleware
 app.use(cors({
     origin: 'http://localhost:5173'
 }))
+
+// Use JSON middleware
+app.use(express.json())
 
 // Hello world test
 app.get('/', (req, res) => {
@@ -24,8 +38,10 @@ app.get('/', (req, res) => {
 //API Routes
 
 //api routes for email-list CRUD 
-app.get("/api/email-lists", async (req, res) => { //this will occur on component mount with the mailing list management component 
-    //check that user is authenticated 
+app.get("/api/email-lists", ClerkExpressWithAuth({
+
+}), async (req: WithAuthProp<Request>, res: Response) => { //this will occur on component mount with the mailing list management component 
+
 
     //use prisma client to query database for email-lists assisated with user
     const emailLists = await prisma.user.findMany({
@@ -36,14 +52,38 @@ app.get("/api/email-lists", async (req, res) => { //this will occur on component
     //return email-lists
 })
 
+interface CreateEmailListBody {
+    name: string;
+    emails: string[];
+}
+
 //api route to create email-list
-app.post("/api/email-lists", async (req, res) => {
-    //check that user is authenticated 
+app.post("/api/email-lists", ClerkExpressWithAuth(), async (req: WithAuthProp<Request>, res: Response) => {
+    const { name, emails } = req.body as unknown as CreateEmailListBody; // Cast to unknown first... do i actually want to do this?
+    const userId = req.auth.userId;
 
-    //use prisma client to create email-list
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+        // Use Prisma client to create email list with associated emails
+        const emailList = await prisma.emailList.create({
+            data: {
+                name,
+                emails,
+                userId
+            }
+        });
 
-    //return email-list
+        // Return the created email list object
+        return res.status(201).json(emailList);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Failed to create email list' });
+    }
 })
+
+//we are gonna do most of this client side 
 
 //api route to update email-list
 app.put("/api/email-lists", async (req, res) => {
@@ -64,8 +104,10 @@ app.delete("/api/email-lists", async (req, res) => {
 })
 
 // API Routes for blast CRUD
-app.get('/api/blasts', async (req, res) => {
-    //check that user is authenticated 
+app.get('/api/dashboard', ClerkExpressWithAuth({
+
+}), async (req: WithAuthProp<Request>, res: Response) => {
+
 
     //use prisma client to query database for blasts assisated with user
 
@@ -73,10 +115,12 @@ app.get('/api/blasts', async (req, res) => {
 
 })
 
-app.post('/api/blasts', async (req, res) => {
-    //check that user is authenticated 
+//API route for composing and sending emails to selected email lists 
+app.post('/api/compose-and-send', ClerkExpressWithAuth({
 
-    //use prisma client to create blast
+}), async (req: WithAuthProp<Request>, res: Response) => {
+
+    //use prisma client to create email blast 
 
     //return blast
 })

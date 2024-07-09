@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@clerk/clerk-react": "^5.2.7",
+    "@clerk/clerk-sdk-node": "^5.0.14",
     "@prisma/client": "^5.16.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
